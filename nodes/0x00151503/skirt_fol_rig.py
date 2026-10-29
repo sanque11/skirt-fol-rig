@@ -7,8 +7,8 @@ NODE_INFO = {
         "最后约束骨骼。运行前选中每条裙链的第一个关节。"
     ),
     "author": "禾洛",
-    "version": "1.0.0",
-    "node": "skirtFolRig",
+    "version": "1.0.1",
+    "node": "skirtFolRigNode",
     "node_id": "0x00151503",
     "category": "rigging",
     "tags": ["绑定", "裙子", "毛囊", "程序化"],
@@ -270,6 +270,52 @@ def show_ui():
     cmds.showWindow("skirtFolRigWin")
 
 
+class SkirtFolRigNode(om.MPxNode):
+    """市场的规范要求插件必须 registerNode，所以注册一个轻量节点。
+
+    它本身只做数值透传（inValue → outValue），真正的功能由命令
+    ``cmds.skirtFolRig()`` 完成（NODE_INFO.run 指向它）。
+    """
+
+    kNodeName = "skirtFolRigNode"
+    kNodeId = om.MTypeId(0x00151503)
+
+    aInValue = om.MObject()
+    aOutValue = om.MObject()
+
+    def __init__(self):
+        super(SkirtFolRigNode, self).__init__()
+
+    @staticmethod
+    def creator():
+        return SkirtFolRigNode()
+
+    @staticmethod
+    def initialize():
+        n = om.MFnNumericAttribute()
+        SkirtFolRigNode.aInValue = n.create("inValue", "iv",
+                                           om.MFnNumericData.kDouble, 0.0)
+        n.keyable = True
+        n.storable = True
+        SkirtFolRigNode.addAttribute(SkirtFolRigNode.aInValue)
+
+        o = om.MFnNumericAttribute()
+        SkirtFolRigNode.aOutValue = o.create("outValue", "ov",
+                                            om.MFnNumericData.kDouble, 0.0)
+        o.writable = False
+        o.storable = False
+        SkirtFolRigNode.addAttribute(SkirtFolRigNode.aOutValue)
+
+        SkirtFolRigNode.attributeAffects(SkirtFolRigNode.aInValue,
+                                         SkirtFolRigNode.aOutValue)
+
+    def compute(self, plug, dataBlock):
+        if plug == SkirtFolRigNode.aOutValue:
+            v = dataBlock.inputValue(SkirtFolRigNode.aInValue).asDouble()
+            dataBlock.outputValue(SkirtFolRigNode.aOutValue).setDouble(v)
+            dataBlock.setClean(plug)
+
+
 class SkirtFolRigCommand(om.MPxCommand):
     kName = "skirtFolRig"
 
@@ -292,21 +338,31 @@ class SkirtFolRigCommand(om.MPxCommand):
 
 
 def initializePlugin(plugin):
-    pluginFn = om.MFnPlugin(plugin, "Heluo", "1.0.0", "Any")
+    pluginFn = om.MFnPlugin(plugin, "Heluo", "1.0.1", "Any")
+    try:
+        pluginFn.registerNode(SkirtFolRigNode.kNodeName,
+                              SkirtFolRigNode.kNodeId,
+                              SkirtFolRigNode.creator,
+                              SkirtFolRigNode.initialize)
+        _log("skirtFolRigNode registered")
+    except Exception as e:
+        _log("节点注册失败：%s" % e)
+        raise
     try:
         pluginFn.registerCommand(SkirtFolRigCommand.kName,
                                  SkirtFolRigCommand.creator)
-        _log("skirtFolRig registered")
+        _log("skirtFolRig command registered")
     except Exception as e:
-        _log("注册失败：%s" % e)
+        _log("命令注册失败：%s" % e)
         raise
 
 
 def uninitializePlugin(plugin):
     pluginFn = om.MFnPlugin(plugin)
-    try:
-        pluginFn.deregisterCommand(SkirtFolRigCommand.kName)
-        _log("skirtFolRig deregistered")
-    except Exception as e:
-        _log("反注册失败：%s" % e)
-        raise
+    for what, fn in (("命令", lambda: pluginFn.deregisterCommand(SkirtFolRigCommand.kName)),
+                     ("节点", lambda: pluginFn.deregisterNode(SkirtFolRigNode.kNodeId))):
+        try:
+            fn()
+            _log("%s 反注册完成" % what)
+        except Exception as e:
+            _log("%s 反注册失败：%s" % (what, e))
