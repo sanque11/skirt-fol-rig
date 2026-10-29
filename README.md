@@ -65,3 +65,65 @@ Maya 2022 / 2023 / 2024 / 2025（2022 mayapy 实测）。
 ## 许可
 
 MIT
+
+## 发布到 Maya 节点插件市场
+
+插件本体在这个仓库，市场索引在
+[maya-node-plugin-index](https://github.com/MengXingXiaoMing/maya-node-plugin-index)。
+上架分两步。
+
+### 1. 插件放自己仓库（本仓库已完成）
+
+```
+nodes/<node_id>/<entry>.py
+```
+
+- 目录名必须是节点注册序号，本插件是 `0x00151503`
+- 入口 `.py` 顶部必须有 `NODE_INFO`，其中 `node_id` / `node` / `version`
+  要和索引条目完全一致
+- 仓库必须是 **public**，索引校验会去读
+
+### 2. 索引仓库加一条 JSON
+
+Fork `maya-node-plugin-index`，在 `plugins/` 下新建 `0x00151503.json`：
+
+```json
+{
+  "name": "裙子毛囊 Rig 生成器",
+  "description": "按骨骼位置批量生成裙子的毛囊驱动 Rig。",
+  "author": "禾洛",
+  "version": "1.0.0",
+  "node_id": "0x00151503",
+  "node_name": "skirtFolRig",
+  "category": "rigging",
+  "tags": ["绑定", "裙子", "毛囊"],
+  "repo": "sanque11/skirt-fol-rig",
+  "subpath": "nodes/0x00151503",
+  "entry": "skirt_fol_rig.py",
+  "branch": "main",
+  "maya_versions": ["2022", "2023", "2024", "2025"],
+  "added": "2026-10-29",
+  "updated": "2026-10-29"
+}
+```
+
+提 PR 后 GitHub Actions 会自动校验并直接合并，`catalog.json` 自动重建，
+市场刷新「在线」页就能看到。
+
+### 发新版
+
+改两处，版本号保持一致：
+
+1. 插件里 `NODE_INFO["version"]`
+2. 索引 `plugins/0x00151503.json` 的 `version` 和 `updated`
+
+市场就会显示「可更新」。
+
+### 踩过的坑
+
+- **路径不能含中文**：Maya 的 `loadPlugin` 在中文路径下会报 UTF-8 解码错误
+- 网页翻译会把 `nodes` 显示成「节点」，但真实路径仍是 `nodes`，别被误导
+- 只改 `plugins/*.json` 的 PR 才会自动合并；动 `catalog.json` / `scripts/`
+  要走人工审核
+- `repo` 必须是 PR 作者**自己的公开仓库**，否则校验不过
+- `category` 必须存在于 `categories.json`（本插件用 `rigging`）
